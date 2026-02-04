@@ -1,0 +1,393 @@
+//@version=5
+//Created by Roflmao
+indicator("Multi MA Suite", overlay=true)
+
+src = close
+
+// ---- Inputs: Line 1 ----
+show1      = input.bool(true,        "Show Line 1")
+maType1    = input.string("SMA",     "Line 1 MA type", options=["SMA","EMA","WMA","VWMA","Hull","VWAP","VIDYA"])
+len1       = input.int(20,           "Line 1 length",  minval=1)
+colAbove1  = input.color(#e91e63,   "Line 1 above")
+colBelow1  = input.color(#56ffce, "Line 1 below")
+
+// ---- Inputs: Line 2 ----
+show2      = input.bool(true,        "Show Line 2")
+maType2    = input.string("WMA",     "Line 2 MA type", options=["SMA","EMA","WMA","VWMA","Hull","VWAP","VIDYA"])
+len2       = input.int(100,           "Line 2 length",  minval=1)
+colAbove2  = input.color(#e91e63, "Line 2 above")
+colBelow2  = input.color(#56ffce,   "Line 2 below")
+
+// ---- Inputs: Line 3 ----
+show3      = input.bool(true,        "Show Line 3")
+maType3    = input.string("VWMA",     "Line 3 MA type", options=["SMA","EMA","WMA","VWMA","Hull","VWAP","VIDYA"])
+len3       = input.int(20,          "Line 3 length",  minval=1)
+colAbove3  = input.color(#e91e63,   "Line 3 above")
+colBelow3  = input.color(#56ffce, "Line 3 below")
+
+// ---- Inputs: Line 4 ----
+show4      = input.bool(true,        "Show Line 4")
+maType4    = input.string("VIDYA",   "Line 4 MA type", options=["SMA","EMA","WMA","VWMA","Hull","VWAP","VIDYA"])
+len4       = input.int(14,           "Line 4 length",  minval=1)
+colAbove4  = input.color(#e91e63, "Line 4 above")
+colBelow4  = input.color(#56ffce,    "Line 4 below")
+
+// ---- Angle Settings ----
+angle_group = "Angle Settings"
+lookbackBars     = input.int(20, "Trend Angle Lookback Bars", minval=1, group=angle_group)
+flatThresholdDeg = input.float(1.0, "Flat threshold (degrees)", minval=0.0, step=0.1, group=angle_group)
+labelVerticalTicks   = input.int(50, "Label vertical offset (ticks)", minval=0, group=angle_group)
+labelHorizontalBars  = input.int(2,  "Label horizontal offset (bars)", minval=1, group=angle_group)
+showAnchorLine   = input.bool(true,  "Show horizontal anchor line", group=angle_group)
+showSlopeLine    = input.bool(false, "Show sloped line from past MA to current", group=angle_group)
+
+showAngle1 = input.bool(true,  "Show Line 1 angle visuals", group=angle_group)
+showAngle2 = input.bool(true,  "Show Line 2 angle visuals", group=angle_group)
+showAngle3 = input.bool(false, "Show Line 3 angle visuals", group=angle_group)
+showAngle4 = input.bool(false, "Show Line 4 angle visuals", group=angle_group)
+
+// ---- Inputs: Buy/Sell Candle Coloring ----
+enableCandleColor = input.bool(true, "Enable Candle Coloring")
+buyColor  = input.color(color.green, "Buy Candle Color")
+sellColor = input.color(color.red,   "Sell Candle Color")
+neutralColor = input.color(color.gray, "Neutral Candle Color")
+
+
+
+// ---- Inputs: Bollinger Bands ----
+showBB     = input.bool(true, "Show Bollinger Bands")
+bbLength   = input.int(20, "BB Length", minval=1)
+bbMult     = input.float(2.0, "BB StdDev Mult", minval=0.1)
+bbSource   = input.source(close, "BB Source")
+
+
+// ---- Inputs: MA Expansion/Compression ----
+expansionLookback = input.int(5, "MA Expansion Lookback Bars", minval=1)
+
+
+// ---- Helper: VIDYA k-factor ----
+vidya_k(src, length) =>
+    fixCMO = true
+    useCMO = true
+    momm     = ta.change(src)
+    m1       = momm >= 0.0 ? momm : 0.0
+    m2       = momm <  0.0 ? -momm : 0.0
+    sm1      = fixCMO ? math.sum(m1, 9) : math.sum(m1, length)
+    sm2      = fixCMO ? math.sum(m2, 9) : math.sum(m2, length)
+    chandeMO = (sm1 + sm2 == 0.0) ? 0.0 : 100.0 * (sm1 - sm2) / (sm1 + sm2)
+    useCMO ? math.abs(chandeMO) / 100.0 : ta.stdev(src, length)
+
+// ---- Function to get MA ----
+getMA(maType, length, vidyaRef) => maType == "SMA"   ? ta.sma(src, length) : maType == "EMA"   ? ta.ema(src, length) : maType == "WMA"   ? ta.wma(src, length) : maType == "VWMA"  ? ta.vwma(src, length) : maType == "Hull"  ? ta.hma(src, length) :  maType == "VWAP"  ? ta.vwap : maType == "VIDYA" ? vidyaRef : na
+
+
+// ---- Helper: stagger offset for labels ----
+getStaggerOffset(lineIndex) =>
+    syminfo.mintick * labelVerticalTicks * lineIndex
+
+// Fixed anchor for labels (above chart high)
+getLabelY(lineIndex) =>
+    high + (syminfo.mintick * labelVerticalTicks * (lineIndex + 1))
+
+
+
+// ---- Per-line calculations ----
+alpha1 = 2.0 / (len1 + 1.0)
+k1 = vidya_k(src, len1)
+var float vidya1 = na
+vidya1 := na(vidya1[1]) ? src : alpha1 * k1 * src + (1.0 - alpha1 * k1) * vidya1[1]
+ma1 = getMA(maType1, len1, vidya1)
+plot(show1 ? ma1 : na, color=ma1 > close ? colAbove1 : colBelow1, linewidth=2, title="Line 1")
+
+alpha2 = 2.0 / (len2 + 1.0)
+k2 = vidya_k(src, len2)
+var float vidya2 = na
+vidya2 := na(vidya2[1]) ? src : alpha2 * k2 * src + (1.0 - alpha2 * k2) * vidya2[1]
+ma2 = getMA(maType2, len2, vidya2)
+plot(show2 ? ma2 : na, color=ma2 > close ? colAbove2 : colBelow2, linewidth=2, title="Line 2")
+
+alpha3 = 2.0 / (len3 + 1.0)
+k3 = vidya_k(src, len3)
+var float vidya3 = na
+vidya3 := na(vidya3[1]) ? src : alpha3 * k3 * src + (1.0 - alpha3 * k3) * vidya3[1]
+ma3 = getMA(maType3, len3, vidya3)
+plot(show3 ? ma3 : na, color=ma3 > close ? colAbove3 : colBelow3, linewidth=2, title="Line 3")
+
+alpha4 = 2.0 / (len4 + 1.0)
+k4 = vidya_k(src, len4)
+var float vidya4 = na
+vidya4 := na(vidya4[1]) ? src : alpha4 * k4 * src + (1.0 - alpha4 * k4) * vidya4[1]
+ma4 = getMA(maType4, len4, vidya4)
+plot(show4 ? ma4 : na, color=ma4 > close ? colAbove4 : colBelow4, linewidth=2, title="Line 4")
+
+plot(show4 ? ma4 : na, color=ma4 > close ? colAbove4 : colBelow4, linewidth=2, title="Line 4")
+
+// ---- Angle calculation function ----
+calcAngle(series, titlePrefix) =>
+    vPast   = series[lookbackBars]
+    deltaY  = na(vPast) ? 0.0 : (series - vPast)
+    deltaX  = lookbackBars
+    angleDeg = deltaX != 0 ? math.atan(deltaY / deltaX) * 180 / math.pi : 0.0
+
+    isFlat     = math.abs(angleDeg) < flatThresholdDeg
+    trendColor = isFlat ? color.gray : angleDeg > 0 ? color.green : color.red
+    trendText  = isFlat ? "Flat " : angleDeg > 0 ? "Up Trend " : "Down Trend "
+    labelText  = titlePrefix + " " + trendText + str.tostring(angleDeg, "#.##") + "°"
+
+    [angleDeg, trendColor, labelText]
+
+// ---- Persistent handles ----
+var label angleLabel1 = na
+var line  anchorLine1 = na
+var line  slopeLine1  = na
+
+var label angleLabel2 = na
+var line  anchorLine2 = na
+var line  slopeLine2  = na
+
+var label angleLabel3 = na
+var line  anchorLine3 = na
+var line  slopeLine3  = na
+
+var label angleLabel4 = na
+var line  anchorLine4 = na
+var line  slopeLine4  = na
+
+
+// ---- Persistent angle series & direction flags ----
+var float angleDeg1Series = na
+var float angleDeg2Series = na
+var float angleDeg3Series = na
+var float angleDeg4Series = na
+
+var bool isUp1 = false, isDown1 = false
+var bool isUp2 = false, isDown2 = false
+var bool isUp3 = false, isDown3 = false
+var bool isUp4 = false, isDown4 = false
+
+
+// ---- Render per MA ----
+if show1 and showAngle1 and not na(ma1)
+    [angleDeg1, trendColor1, labelText1] = calcAngle(ma1, "Line 1")
+    // persist angle and flags
+    angleDeg1Series := angleDeg1
+    isUp1   := angleDeg1 >  flatThresholdDeg
+    isDown1 := angleDeg1 < -flatThresholdDeg
+    if showAnchorLine and bar_index > lookbackBars and not na(ma1[lookbackBars])
+        if not na(anchorLine1)
+            line.delete(anchorLine1)
+        anchorLine1 := line.new(bar_index - lookbackBars, ma1[lookbackBars], bar_index, ma1[lookbackBars],     color=color.gray, style=line.style_dashed, width=1)
+    if showSlopeLine and bar_index > lookbackBars and not na(ma1[lookbackBars])
+        if not na(slopeLine1)
+            line.delete(slopeLine1)
+        slopeLine1 := line.new(bar_index - lookbackBars, ma1[lookbackBars], bar_index, ma1,
+                               color=trendColor1, style=line.style_solid, width=2)
+    if barstate.islast
+        if not na(angleLabel1)
+            label.delete(angleLabel1)
+        angleLabel1 := label.new(bar_index + labelHorizontalBars,
+                                 getLabelY(0),   // Line 1 → index 0
+                                 labelText1, style=label.style_label_left, xloc=xloc.bar_index,
+                                 textcolor=color.white, color=trendColor1, size=size.small)
+
+
+if show2 and showAngle2 and not na(ma2)
+    [angleDeg2, trendColor2, labelText2] = calcAngle(ma2, "Line 2")
+    angleDeg2Series := angleDeg2
+    isUp2   := angleDeg2 >  flatThresholdDeg
+    isDown2 := angleDeg2 < -flatThresholdDeg
+    if showAnchorLine and bar_index > lookbackBars and not na(ma2[lookbackBars])
+        if not na(anchorLine2)
+            line.delete(anchorLine2)
+        anchorLine2 := line.new(bar_index - lookbackBars, ma2[lookbackBars], bar_index, ma2[lookbackBars],   color=color.gray, style=line.style_dashed, width=1)
+    if showSlopeLine and bar_index > lookbackBars and not na(ma2[lookbackBars])
+        if not na(slopeLine2)
+            line.delete(slopeLine2)
+        slopeLine2 := line.new(bar_index - lookbackBars, ma2[lookbackBars], bar_index, ma2,
+                               color=trendColor2, style=line.style_solid, width=2)
+    if barstate.islast
+        if not na(angleLabel2)
+            label.delete(angleLabel2)
+        angleLabel2 := label.new(bar_index + labelHorizontalBars,
+                                 getLabelY(1),   // Line 2 → index 1
+                                 labelText2, style=label.style_label_left, xloc=xloc.bar_index,
+                                 textcolor=color.white, color=trendColor2, size=size.small)
+
+
+if show3 and showAngle3 and not na(ma3)
+    [angleDeg3, trendColor3, labelText3] = calcAngle(ma3, "Line 3")
+    angleDeg3Series := angleDeg3
+    isUp3   := angleDeg3 >  flatThresholdDeg
+    isDown3 := angleDeg3 < -flatThresholdDeg
+    if showAnchorLine and bar_index > lookbackBars and not na(ma3[lookbackBars])
+        if not na(anchorLine3)
+            line.delete(anchorLine3)
+        anchorLine3 := line.new(bar_index - lookbackBars, ma3[lookbackBars], bar_index, ma3[lookbackBars],   color=color.gray, style=line.style_dashed, width=1)
+    if showSlopeLine and bar_index > lookbackBars and not na(ma3[lookbackBars])
+        if not na(slopeLine3)
+            line.delete(slopeLine3)
+        slopeLine3 := line.new(bar_index - lookbackBars, ma3[lookbackBars], bar_index, ma3,
+                               color=trendColor3, style=line.style_solid, width=2)
+    if barstate.islast
+        if not na(angleLabel3)
+            label.delete(angleLabel3)
+        angleLabel3 := label.new(bar_index + labelHorizontalBars,
+                                 getLabelY(2),   // Line 3 → index 2
+                                 labelText3, style=label.style_label_left, xloc=xloc.bar_index,
+                                 textcolor=color.white, color=trendColor3, size=size.small)
+
+
+if show4 and showAngle4 and not na(ma4)
+    [angleDeg4, trendColor4, labelText4] = calcAngle(ma4, "Line 4")
+    angleDeg4Series := angleDeg4
+    isUp4   := angleDeg4 >  flatThresholdDeg
+    isDown4 := angleDeg4 < -flatThresholdDeg
+    if showAnchorLine and bar_index > lookbackBars and not na(ma4[lookbackBars])
+        if not na(anchorLine4)
+            line.delete(anchorLine4)
+        anchorLine4 := line.new(bar_index - lookbackBars, ma4[lookbackBars], bar_index, ma4[lookbackBars],  color=color.gray, style=line.style_dashed, width=1)
+    if showSlopeLine and bar_index > lookbackBars and not na(ma4[lookbackBars])
+        if not na(slopeLine4)
+            line.delete(slopeLine4)
+        slopeLine4 := line.new(bar_index - lookbackBars, ma4[lookbackBars], bar_index, ma4,
+                               color=trendColor4, style=line.style_solid, width=2)
+    if barstate.islast
+        if not na(angleLabel4)
+            label.delete(angleLabel4)
+        angleLabel4 := label.new(bar_index + labelHorizontalBars,
+                                 getLabelY(3),   // Line 4 → index 3
+                                 labelText4, style=label.style_label_left, xloc=xloc.bar_index,
+                                 textcolor=color.white, color=trendColor4, size=size.small)
+
+
+// ---- Distance calculations between active MAs ----
+dist12 = show1 and show2 ? math.abs(ma1 - ma2) : na
+dist23 = show2 and show3 ? math.abs(ma2 - ma3) : na
+dist34 = show3 and show4 ? math.abs(ma3 - ma4) : na
+
+dist12_prev = not na(dist12) ? dist12[expansionLookback] : na
+dist23_prev = not na(dist23) ? dist23[expansionLookback] : na
+dist34_prev = not na(dist34) ? dist34[expansionLookback] : na
+
+// Flags: increasing or decreasing
+dist12_increasing = not na(dist12) and dist12 > dist12_prev
+dist23_increasing = not na(dist23) and dist23 > dist23_prev
+dist34_increasing = not na(dist34) and dist34 > dist34_prev
+
+// Percentage change
+change12 = not na(dist12) and not na(dist12_prev) ? ((dist12 - dist12_prev) / dist12_prev) * 100 : na
+change23 = not na(dist23) and not na(dist23_prev) ? ((dist23 - dist23_prev) / dist23_prev) * 100 : na
+change34 = not na(dist34) and not na(dist34_prev) ? ((dist34 - dist34_prev) / dist34_prev) * 100 : na
+
+
+// ---- Collect active angle directions ----
+var int activeCount = 0
+var int upCount = 0
+var int downCount = 0
+
+activeCount := 0
+upCount := 0
+downCount := 0
+
+if show1 and showAngle1 and not na(ma1) and not na(angleDeg1Series)
+    activeCount += 1
+    if isUp1
+        upCount += 1
+    else if isDown1
+        downCount += 1
+
+if show2 and showAngle2 and not na(ma2) and not na(angleDeg2Series)
+    activeCount += 1
+    if isUp2
+        upCount += 1
+    else if isDown2
+        downCount += 1
+
+if show3 and showAngle3 and not na(ma3) and not na(angleDeg3Series)
+    activeCount += 1
+    if isUp3
+        upCount += 1
+    else if isDown3
+        downCount += 1
+
+if show4 and showAngle4 and not na(ma4) and not na(angleDeg4Series)
+    activeCount += 1
+    if isUp4
+        upCount += 1
+    else if isDown4
+        downCount += 1
+
+allUp   = (activeCount > 0) and (upCount == activeCount)
+allDown = (activeCount > 0) and (downCount == activeCount)
+
+
+
+// ---- Trend/Range Detection ----
+enableTrendRange = input.bool(true, "Enable Trend/Range Detection")
+threshold        = input.float(0.1, "ΔDistance Threshold", minval=0.0)
+useSlopeCheck    = input.bool(false, "Enable Slope Check")
+
+maCompare1 = input.string("Line 1", "First MA to Compare", options=["Line 1","Line 2","Line 3","Line 4"])
+maCompare2 = input.string("Line 2", "Second MA to Compare", options=["Line 1","Line 2","Line 3","Line 4"])
+
+getSelectedMA(line) =>
+    if line == "Line 1"
+        ma1
+    else if line == "Line 2"
+        ma2
+    else if line == "Line 3"
+        ma3
+    else if line == "Line 4"
+        ma4
+    else
+        na
+
+maA = getSelectedMA(maCompare1)
+maB = getSelectedMA(maCompare2)
+
+dist     = math.abs(maA - maB)
+prevDist = dist[1]
+deltaDist = dist - prevDist
+
+slopeA = maA - maA[1]
+slopeB = maB - maB[1]
+flatSlope = math.abs(slopeA) < threshold and math.abs(slopeB) < threshold
+
+isTrending = enableTrendRange and (deltaDist > threshold) and (not useSlopeCheck or not flatSlope)
+isRanging  = enableTrendRange and (deltaDist <= threshold) and (not useSlopeCheck or flatSlope)
+
+plotshape(isTrending, title="Trending", style=shape.circle, 
+          color=color.rgb(255, 255, 255), location=location.belowbar, size=size.tiny)
+
+plotshape(isRanging, title="Ranging", style=shape.xcross, 
+          color=color.red, location=location.abovebar, size=size.tiny)
+
+
+// ---- Bollinger Bands Calculation ----
+basis = ta.sma(bbSource, bbLength)
+dev   = bbMult * ta.stdev(bbSource, bbLength)
+upper = basis + dev
+lower = basis - dev
+
+plot(showBB ? basis : na, color=color.new(color.blue, 0), title="BB Basis")
+plot(showBB ? upper : na, color=color.new(color.blue, 0), title="BB Upper")
+plot(showBB ? lower : na, color=color.new(color.blue, 0), title="BB Lower")
+
+
+
+// ----- Dsitance calculation table -------
+if barstate.islast
+    var distTable = table.new(position.bottom_right, 2, 3, bgcolor=color.white, border_color=color.black)
+
+    if not na(dist12)
+        table.cell(distTable, 0, 0, "MA1-MA2", text_color=color.black)
+        table.cell(distTable, 1, 0, dist12_increasing ? "↑ " + str.tostring(change12, "#.##") + "%" : "↓ " + str.tostring(change12, "#.##") + "%",  bgcolor=dist12_increasing ? #2958f3 : #ff9641, text_color=color.white)
+
+    if not na(dist23)
+        table.cell(distTable, 0, 1, "MA2-MA3", text_color=color.black)
+        table.cell(distTable, 1, 1, dist23_increasing ? "↑ " + str.tostring(change23, "#.##") + "%" : "↓ " + str.tostring(change23, "#.##") + "%",  bgcolor=dist23_increasing ? #2958f3 : #ff9641, text_color=color.white)
+
+    if not na(dist34)
+        table.cell(distTable, 0, 2, "MA3-MA4", text_color=color.black)
+        table.cell(distTable, 1, 2, dist34_increasing ? "↑ " + str.tostring(change34, "#.##") + "%" : "↓ " + str.tostring(change34, "#.##") + "%",  bgcolor=dist34_increasing ? #2958f3 : #ff9641, text_color=color.white)
+
