@@ -327,60 +327,31 @@ if show4 and showAngle4 and not na(ma4) and not na(angleDeg4Series)
 allUp   = (activeCount > 0) and (upCount == activeCount)
 allDown = (activeCount > 0) and (downCount == activeCount)
 
-// ---- Helper: Multi-timeframe Direction ----
+// ---- Helper: Multi-timeframe Direction (uses existing MA logic per TF) ----
 getDirection(tf) =>
-    // Request price series from higher timeframe
     cl = request.security(syminfo.tickerid, tf, close)
 
-    // Recalculate MAs in that timeframe (only once per MA)
-    ma1_tf = request.security(syminfo.tickerid, tf, ta.sma(close, maLength1))
-    ma2_tf = request.security(syminfo.tickerid, tf, ta.sma(close, maLength2))
-    ma3_tf = request.security(syminfo.tickerid, tf, ta.sma(close, maLength3))
-    ma4_tf = request.security(syminfo.tickerid, tf, ta.sma(close, maLength4))
+    // Use your existing MA calculations but wrapped in request.security for each timeframe
+    ma1_tf = request.security(syminfo.tickerid, tf, ma1)
+    ma2_tf = request.security(syminfo.tickerid, tf, ma2)
+    ma3_tf = request.security(syminfo.tickerid, tf, ma3)
+    ma4_tf = request.security(syminfo.tickerid, tf, ma4)
 
-    // Price relative to MAs
-    priceAboveAll = ( (not show1 or cl > ma1_tf) and 
-                      (not show2 or cl > ma2_tf) and 
-                      (not show3 or cl > ma3_tf) and 
-                      (not show4 or cl > ma4_tf) )
+    activeCount = (show1 ? 1 : 0) + (show2 ? 1 : 0) + (show3 ? 1 : 0) + (show4 ? 1 : 0)
 
-    priceBelowAll = ( (not show1 or cl < ma1_tf) and 
-                      (not show2 or cl < ma2_tf) and 
-                      (not show3 or cl < ma3_tf) and 
-                      (not show4 or cl < ma4_tf) )
+    aboveCount = (show1 and cl > ma1_tf ? 1 : 0) + (show2 and cl > ma2_tf ? 1 : 0) + (show3 and cl > ma3_tf ? 1 : 0) + (show4 and cl > ma4_tf ? 1 : 0)
+    belowCount = (show1 and cl < ma1_tf ? 1 : 0) + (show2 and cl < ma2_tf ? 1 : 0) + (show3 and cl < ma3_tf ? 1 : 0) + (show4 and cl < ma4_tf ? 1 : 0)
 
-    // ---- Angle calculation per timeframe (optimized) ----
-    angle1_tf = show1 ? math.atan((ma1_tf - ma1_tf[lookbackBars]) / lookbackBars) * 180 / math.pi : na
-    angle2_tf = show2 ? math.atan((ma2_tf - ma2_tf[lookbackBars]) / lookbackBars) * 180 / math.pi : na
-    angle3_tf = show3 ? math.atan((ma3_tf - ma3_tf[lookbackBars]) / lookbackBars) * 180 / math.pi : na
-    angle4_tf = show4 ? math.atan((ma4_tf - ma4_tf[lookbackBars]) / lookbackBars) * 180 / math.pi : na
+    priceAboveAll = activeCount > 0 and aboveCount == activeCount
+    priceBelowAll = activeCount > 0 and belowCount == activeCount
 
-    upCount_tf   = (not na(angle1_tf) and angle1_tf > flatThresholdDeg ? 1 : 0) +
-                   (not na(angle2_tf) and angle2_tf > flatThresholdDeg ? 1 : 0) +
-                   (not na(angle3_tf) and angle3_tf > flatThresholdDeg ? 1 : 0) +
-                   (not na(angle4_tf) and angle4_tf > flatThresholdDeg ? 1 : 0)
-
-    downCount_tf = (not na(angle1_tf) and angle1_tf < -flatThresholdDeg ? 1 : 0) +
-                   (not na(angle2_tf) and angle2_tf < -flatThresholdDeg ? 1 : 0) +
-                   (not na(angle3_tf) and angle3_tf < -flatThresholdDeg ? 1 : 0) +
-                   (not na(angle4_tf) and angle4_tf < -flatThresholdDeg ? 1 : 0)
-
-    activeCount_tf = (not na(angle1_tf) ? 1 : 0) + (not na(angle2_tf) ? 1 : 0) +
-                     (not na(angle3_tf) ? 1 : 0) + (not na(angle4_tf) ? 1 : 0)
-
-    allAnglesUp_tf   = (activeCount_tf > 0) and (upCount_tf == activeCount_tf)
-    allAnglesDown_tf = (activeCount_tf > 0) and (downCount_tf == activeCount_tf)
-
-    // Final direction
-    dirBuy  = priceAboveAll and allAnglesUp_tf
-    dirSell = priceBelowAll and allAnglesDown_tf
+    dirBuy  = priceAboveAll
+    dirSell = priceBelowAll
 
     dirText  = dirBuy ? "BUY" : dirSell ? "SELL" : "NEUTRAL"
     dirColor = dirBuy ? color.green : dirSell ? color.red : color.gray
 
-    dirText, dirColor   // must be the last line
-
-
+    dirText, dirColor
 
 // ---- Multi-timeframe Direction Table ----
 if barstate.islast
