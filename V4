@@ -315,6 +315,14 @@ if show4 and showAngle4 and not na(ma4) and not na(angleDeg4Series)
 allUp   = (activeCount > 0) and (upCount == activeCount)
 allDown = (activeCount > 0) and (downCount == activeCount)
 
+
+// ---- Signal State Memory ----
+var int lastSignal = 0
+//  1 = last signal was BUY
+// -1 = last signal was SELL
+//  0 = none yet
+
+
 // ---- Current Timeframe Buy / Sell Conditions ----
 
 // Price above/below all active MAs
@@ -334,12 +342,21 @@ priceBelowAll = (activeCount > 0) and
 angleAllUp   = (not show1 or isUp1)   and (not show2 or isUp2)   and (not show3 or isUp3)   and (not show4 or isUp4)
 angleAllDown = (not show1 or isDown1) and (not show2 or isDown2) and (not show3 or isDown3) and (not show4 or isDown4)
 
+
+
 // Final signals
 buyCondition  = useAngleConfirmation ? (priceAboveAll and angleAllUp)   : priceAboveAll
 sellCondition = useAngleConfirmation ? (priceBelowAll and angleAllDown) : priceBelowAll
 
-buySignal  = buyCondition  and not buyCondition[1]
-sellSignal = sellCondition and not sellCondition[1]
+// ---- One-signal-per-direction logic ----
+buySignal  = buyCondition  and lastSignal != 1
+sellSignal = sellCondition and lastSignal != -1
+
+if buySignal
+    lastSignal := 1
+else if sellSignal
+    lastSignal := -1
+
 
 // ---- Plot Buy / Sell Signals ----
 plotshape(     buySignal,     title="BUY Signal",     style=shape.labelup,     location=location.belowbar,     text="BUY",     color=color.new(color.green, 0),     textcolor=color.white)
