@@ -49,14 +49,6 @@ showAngle4 = input.bool(false, "Show Line 4 angle visuals", group=angle_group)
 useAngleConfirmation = input.bool(false, "Include Angle in Buy/Sell Signals")
 
 
-// ---- Inputs: Buy/Sell Candle Coloring ----
-enableCandleColor = input.bool(true, "Enable Candle Coloring")
-buyColor  = input.color(color.green, "Buy Candle Color")
-sellColor = input.color(color.red,   "Sell Candle Color")
-neutralColor = input.color(color.gray, "Neutral Candle Color")
-
-
-
 // ---- Inputs: Bollinger Bands ----
 showBB     = input.bool(true, "Show Bollinger Bands")
 bbLength   = input.int(20, "BB Length", minval=1)
