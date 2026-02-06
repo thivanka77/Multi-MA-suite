@@ -346,6 +346,8 @@ plotshape(     buySignal,     title="BUY Signal",     style=shape.labelup,     l
 
 plotshape(     sellSignal,     title="SELL Signal",     style=shape.labeldown,     location=location.abovebar,     text="SELL",     size=size.small,     color=color.new(color.red, 0),     textcolor=color.white)
 
+alertcondition(buySignal,  title="BUY Alert",  message="BUY signal on {{ticker}} {{interval}}")
+alertcondition(sellSignal, title="SELL Alert", message="SELL signal on {{ticker}} {{interval}}")
 
 
 // ---- Helper: Multi-timeframe Direction (with optional angle confirmation) ----
