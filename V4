@@ -399,7 +399,7 @@ getDirection(tf) =>
 
 // ---- Multi-timeframe Direction Table ----
 if barstate.islast
-    var dirTable = table.new(position.top_right, 2, 6, bgcolor=color.white, border_color=color.black)
+    var dirTable = table.new(position.bottom_left, 2, 6, bgcolor=color.white, border_color=color.black)
     table.clear(dirTable, 0, 0, 1, 5)
 
     // Declare variables once
